@@ -15,10 +15,9 @@ function span(arr, predicate) {
   return [first, second];
 }
 
+// Submitted
 function span(arr, predicate) {
   var len = arr.length;
-  var first = [];
-  var second = [];
   for(var i = 0; i<len; ++i) {
     if(!predicate(arr[i])) {
       break;
