@@ -8,6 +8,7 @@ function filterInt(value) {
   }
 }
 
+// Too much recursion
 function prefill(n, v) {
   var len = filterInt(n);
   // Array generation
@@ -34,15 +35,7 @@ function prefill(n, v) {
   return result;
 }
 
-function prefill(n, v) {
-  var len = filterInt(n);// Array generation
-  var result = [];
-  for(var i = 0; i < len; ++i) {
-    result[i] = v;
-  }
-  return result;
-}
-
+// Submitted
 function prefill(n, v) {
   var len = filterInt(n);// Array generation
   // Array generation
@@ -63,24 +56,11 @@ function prefill(n, v) {
   return result;
 }
 
-function prefill(n, v) {
-  if (typeof n == 'boolean' || n != ~~n || n < 0 || !isFinite(n))
-    throw new TypeError(n + ' is invalid');
-  return Array.apply(null, { length: n }).map(function() { return v; });
-}
-
-function prefill(n, v) {
-  var len = filterInt(n);
-  var result = [];
-  result.length = len;
-  return result.map(function () { return v; });
-}
-
-
-function prefill(n, v) {
-  if (typeof n == 'boolean' || n != ~~n || n < 0 || !isFinite(n))
-    throw new TypeError(n + ' is invalid');
-  return Array.apply(Array, { length: n }).map(function() { return v; });
-}
+// Solution by another user
+// function prefill(n, v) {
+//   if (typeof n == 'boolean' || n != ~~n || n < 0 || !isFinite(n))
+//     throw new TypeError(n + ' is invalid');
+//   return Array.apply(Array, { length: n }).map(function() { return v; });
+//}
 
 console.log(prefill(5, 1));
