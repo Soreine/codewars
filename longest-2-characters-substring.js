@@ -1,5 +1,5 @@
 // return the longest substring within str which contains at most 2 characters.
-// Complexity O(n*k) with n the string length and k the length of the result
+// Complexity O(n) in terms of access to characters from the string
 function substring(str) {
   var chars = str.split(''); 
   var iter = 0;
@@ -32,23 +32,36 @@ function substring(str) {
   var maxLength = 0;
   var maxString = "";
   var s;
-  for(var i = 0; i < str.length - maxLength; ++i) {
+  var i = 0;
+  while(i < str.length - maxLength) {
     s = longest2(chars, i);
     if(s.length > maxLength) {
       maxLength = s.length;
       maxString = s;
     }
+    // Advance to the next potential index. For example if s ==
+    // "abbaabbb" we would jump here directly "abbaa|bbb..."
+    i += s.length - 1;
+    var lastChar = str[i];
+    while(i > 0 && str[i] === lastChar) {
+      --i;
+    }
+    i++;
+    if(i == 0) {
+      // The string contains only one character
+      break;
+    }
   }
-  console.log(str.length + " : " + iter);
+  console.log("----------------------\n" + "n\t" + str.length + "\nIter\t" + iter);
   return maxString;
 }
 
-console.log(substring("") + ' => ""');
-console.log(substring("a") + ' => "a"');
-console.log(substring("aaa") + ' => "aaa"');
-console.log(substring("abacd") + ' => "aba"');
-console.log(substring("abacddcd") + ' => "cddcd"');
-console.log(substring("cefageaacceaccacca") + ' => "accacca"');
-console.log(substring("abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc") + ' => "ab"');
-// This is kind of worst case... O(n²)
-console.log(substring("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaacbaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") + ' => "aaaaac"');
+console.log("Expect\t" + '' + "\nResult\t" + substring(""));
+console.log("Expect\t" + 'a' + "\nResult\t" + substring("a"));
+console.log("Expect\t" + 'aaa' + "\nResult\t" + substring("aaa"));
+console.log("Expect\t" + 'aba' + "\nResult\t" + substring("abacd"));
+console.log("Expect\t" + 'cddcd' + "\nResult\t" + substring("abacddcd"));
+console.log("Expect\t" + 'accacca' + "\nResult\t" + substring("cefageaacceaccacca"));
+// Example of complexity 3*(n - 2)
+console.log("Expect\t" + 'ab' + "\nResult\t" + substring("abcabcabcabcabcabcabcabcabcabcabcabcabcabc"));
+
