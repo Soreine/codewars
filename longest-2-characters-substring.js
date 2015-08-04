@@ -65,3 +65,20 @@ console.log("Expect\t" + 'accacca' + "\nResult\t" + substring("cefageaacceaccacc
 // Example of complexity 3*(n - 2)
 console.log("Expect\t" + 'ab' + "\nResult\t" + substring("abcabcabcabcabcabcabcabcabcabcabcabcabcabc"));
 
+
+var ab = [];
+var cd = [];
+var result = [];
+var i;
+var k = 1000;
+for(i = 0; i < k; ++i) {
+  ab.push("a");
+  ab.push("b");
+  cd.push("c");
+  cd.push("d");
+}
+for(i = 0; i < k; ++i) {
+  result = result.concat(ab, cd);
+}
+
+console.log(result.join(''));
