@@ -1,22 +1,22 @@
 // http://www.codewars.com/kata/metaprogramming-lisp-style-generic-functions
 
 function callNextMethod(context) {
-  debugger;
   var args = Array.prototype.slice.call(arguments,1);
   // Shorthand
   var chain = context.currentCallChain;
   var ret;
   var fn;
+  debugger;
   if(chain.around.length > 0) {
     fn = chain.around[0].func;
     // Remove it from the chain
-    chain.around = chain.around.unshift();
+    chain.around = chain.around.slice(1);
     ret = fn.apply(context, args);
   } else if (chain.primary.length > 0) {
     chain.before.forEach(function (meth) {meth.func.apply(context, args);});
     chain.before = [];
     fn = chain.primary[0].func;
-    chain.primary = chain.primary.unshift();
+    chain.primary = chain.primary.slice(1);
     ret = fn.apply(context, args);
     chain.after.forEach(function (meth) {meth.func.apply(context, args);});
     chain.after = [];
@@ -45,7 +45,8 @@ function matchesType(obj, type) {
         }
       }
     }
-  } else if(obj === null && type === 'null') {
+  }
+  if(obj === null && type === 'null') {
     // Case 3
     return 3;
   } else if (typeof obj === type) {
@@ -62,8 +63,20 @@ function arrayEqual(arr1, arr2) {
     arr1.every(function (value, index) {return value === arr2[index];});
 }
 
+// TODO clean
 function cloneArray(arr) {
   return arr.reduce(function (result, x) { result.push(x); return result; }, []);
+}
+
+
+function toType (x) {
+  if(typeof x == 'object') {
+    return Object.getPrototypeOf(x).constructor.name;
+  } else if (x == null) {
+    return 'null';
+  } else {
+    return typeof x;
+  }
 }
 
 // Compare two arrays of same lengths, according to their values,
@@ -92,6 +105,8 @@ function defgeneric(name) {
     combination = combination || 'primary';
     // XXX: assign the new method
     defined[combination].push({discr: discriminator.split(','), func: fn});
+    // invalidate cache
+    cache = [];
     return generic;
   };
   
@@ -101,6 +116,8 @@ function defgeneric(name) {
     discriminator = discriminator.split(',');
     defined[combination] = defined[combination].filter(
       function (meth) {return !arrayEqual(discriminator, meth.discr);});
+    // invalidate cache
+    cache = [];
     return generic;
   };
 
@@ -108,10 +125,19 @@ function defgeneric(name) {
     // XXX: return the function that this generic would invoke
     // given the Arguments list at the time of invocation.
     var args = Array.prototype.slice.call(arguments, 0);
-    var context = {currentCallChain: generateCallChain(args)};
-    // The chain call is determined
-    return callNextMethod.bind(null, context);
-    // TODO put result in cache
+    var signature = args.map(toType).join(',');
+    var method = cache[signature];
+    if(method === undefined) {
+      var context = {currentCallChain: generateCallChain(args)};
+      if(context.currentCallChain.primary.length == 0 &&
+         context.currentCallChain.around.length == 0) {
+        throw "No method found for " + name + " with args: " + args.map(printType).join(', ');
+      }
+      method = callNextMethod.bind(null, context);
+      // Put result in cache
+      cache[signature] = method;
+    }
+    return method;
   };
 
   // ----------------------------------------
@@ -123,25 +149,23 @@ function defgeneric(name) {
     'after': []
   };
 
-  var currentCallChain = {};
-
+  var cache = [];
+  
   function generateCallChain(args) {
     function discrToSpecificity(methodArr) {
-      var ret =  methodArr.filter(function (meth) {return meth.discr.length == args.length;});
-      ret = ret.map(function (meth) {
+      var ret = methodArr.map(function (meth) {
         // Convert discriminator to array of matching specificity
         return {
+          discr: meth.discr,
           matches: meth.discr.map(
             function (type, index) { return matchesType(args[index], type); }),
           func: meth.func};
       });
-      debugger;
       ret = ret.filter(function (meth) {
         return 0 < meth.matches.reduce(function (result, specificity) { return result * specificity; }, 1);
       });
       return ret;
     }
-    debugger;
     var mostSpecificFirst = function (method1, method2) {
       return -compareArray(method1.matches, method2.matches);
     };
@@ -171,6 +195,23 @@ function assert(computed) {
   assertEquals(computed, true);
 }
 
+function assertError(msg, func) {
+  var args = Array.prototype.slice.call(arguments, 2);
+  try {
+    var ret = func.apply(this, args);
+  } catch (exc) {
+    if(!msg || exc === msg) {
+      console.log("correct error caught: " + exc);
+      return;
+    } else {
+      console.log("EXPECTED ERROR: " + msg);
+      console.log("    but caught: " + exc);
+      return;
+    }
+  }
+  console.log("NO ERROR THROWN, returned " + ret);
+}
+
 function testHeader(title) {
   console.log("====================");
   console.log("Testing " + title);
@@ -188,6 +229,7 @@ Platypus.prototype = new Mammal();
 Platypus.prototype.constructor = Platypus;
 
 testHeader("matchesType");
+console.log(Object.getPrototypeOf(Object).constructor.name);
 assertEquals(matchesType(new Mammal(), 'Mammal'),5);
 assertEquals(matchesType(new Mammal(), 'Object'),4);
 assertEquals(matchesType(new Platypus(), 'Mammal'),4);
@@ -200,32 +242,67 @@ assertEquals(matchesType("", 'string'), 2);
 assertEquals(matchesType(new String(), 'string'), 0);
 assertEquals(matchesType(new String(), 'string'), 0);
 
-testHeader("arrayEqual");
-assert(arrayEqual(["Mammal", "string", "*"], ["Mammal", "string", "*"]));
-assert(!arrayEqual(["Mammal", "string", "*"], ["string", "string", "*"]));
-assert(!arrayEqual(["Mammal", "string", "*"], ["string", "Platypus"]));
+// testHeader("arrayEqual");
+// assert(arrayEqual(["Mammal", "string", "*"], ["Mammal", "string", "*"]));
+// assert(!arrayEqual(["Mammal", "string", "*"], ["string", "string", "*"]));
+// assert(!arrayEqual(["Mammal", "string", "*"], ["string", "Platypus"]));
 
 testHeader("defmethod");
 var generic = defgeneric("testGeneric1");
 generic
-      .defmethod("Mammal,undefined", function (m, e) { return "Mammals love nothing";})
-      .defmethod("Mammal,*", function (m, e) { return "Mammals love " + e;})
-      .defmethod("Platypus,*", function (p, e) { return "Platypuses love " + e; })
-      .defmethod("Platypus,undefined", function (p) { return "Platypus is sad"; });
-assertEquals(generic(new Mammal(), 3), "Mammals love 3");
-assertEquals(generic(new Mammal(), "you"), "Mammals love you");
-assertEquals(generic(new Platypus(), "you"), "Platypuses love you");
-assertEquals(generic(new Platypus(), undefined), "Platypus is sad");
-assertEquals(generic(new Mammal()), "Mammals love nothing");
+  .defmethod("Mammal,undefined", function (m, e) { return "Mammals love nothing";})
+  .defmethod("Mammal,*", function (m, e) { return "Mammals love " + e;})
+  .defmethod("Platypus,*", function (p, e) { return "Platypuses love " + e; })
+  .defmethod("Platypus,undefined", function (p) { return "Platypus is sad"; });
+// assertEquals(generic(new Mammal(), 3), "Mammals love 3");
+// assertEquals(generic(new Mammal(), "you"), "Mammals love you");
+// assertEquals(generic(new Platypus(), "you"), "Platypuses love you");
+// assertEquals(generic(new Platypus(), undefined), "Platypus is sad");
+// //assertEquals(generic(new Mammal()), "Mammals love nothing");
     
+// testHeader("removeMethod");
+// generic.removeMethod("Platypus,*");
+// assertEquals(generic(new Platypus(), "even Platypuses"), "Mammals love even Platypuses");
+// generic.removeMethod("Mammal,*");
+// assertEquals(generic(new Platypus()), "Platypus is sad");
+// assertError("No method found for testGeneric1 with args: Platypus, number", generic, new Platypus(), 4);
 
-testHeader("removeMethod");
-generic.removeMethod("Platypus,*");
-assertEquals(generic(new Platypus(), "even Platypuses"), "Mammals love even Platypuses");
+testHeader("callNextMethod");
+// Simple test for inheritance and callNextMethod() on 'primary' method
+var name = defgeneric('name')
+      .defmethod('Mammal', function () { return 'Mammy'; })
+      .defmethod('Platypus', function (p) { return 'Platty ' + callNextMethod(this,p); });
 
+assertEquals(name(new Rhino()), 'Mammy');
+assertEquals(name(new Platypus()), 'Platty Mammy');
+
+// Add more tests to exercise 'before', 'after'
+testHeader("Before and After");
+var msgs = "";
+var log = function (str) { msgs += str; };
+var describe = defgeneric('describe')
+      .defmethod('Platypus', function () { log('Platy' + arguments.length.toString()); return 'P'; })
+      .defmethod('Mammal', function () { log('Mammy' + arguments.length.toString()); return 'M'; })
+      .defmethod('Platypus', function () { log('platypus' + arguments.length.toString()); }, 'before')
+      .defmethod('Platypus', function () { log('/platypus' + arguments.length.toString()); }, 'after')
+      .defmethod('Mammal', function () { log('mammal' + arguments.length.toString()); }, 'before')
+      .defmethod('Mammal', function () { log('/mammal' + arguments.length.toString()); }, 'after')
+      .defmethod('object', function () { log('object' + arguments.length.toString()); }, 'before')
+      .defmethod('object', function () { log('/object' + arguments.length.toString()); }, 'after');
+
+var tryIt = function (a) {
+  msgs = "";
+  var ret = describe(a);
+  return ret + ':' + msgs;
+};
+    
+console.log(tryIt(new Platypus()));
+console.log("P:platypus1mammal1object1Platy1/object1/mammal1/platypus1");
 
 /* Comments to improve the kata
 
  Rename defmethod to defMethod
+
+ Should missing argument match unefined signatures ?
 
 */
