@@ -98,14 +98,12 @@ function defgeneric(name) {
     this.name = name;
     // One possible implementation of the generic function
     var args = Array.prototype.slice.call(arguments,0);
-    console.log(name + " CALLED with " + args);
     var method = generic.findMethod.apply(this, args);
     return method.apply(this, args);
   };
   
   generic.defmethod = function (discriminator, fn, combination) {
     combination = combination || 'primary';
-    console.log(name + " add " + discriminator + " " + combination);
     // XXX: assign the new method
     this.removeMethod(discriminator, combination);
     defined[combination].push({discr: discriminator.split(','), func: fn});
@@ -117,7 +115,6 @@ function defgeneric(name) {
   generic.removeMethod = function (discriminator, combination) {
     combination = combination || 'primary';
     // XXX: remove the method
-    console.log(name + " remove " + discriminator + " " + combination);
     discriminator = discriminator.split(',');
     defined[combination] = defined[combination].filter(
       function (meth) {return !arrayEqual(discriminator, meth.discr);});
