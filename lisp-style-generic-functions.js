@@ -2,26 +2,26 @@
 
 function callNextMethod(context) {
   var args = Array.prototype.slice.call(arguments,1);
-  // Shorthand
-  var chain = context.currentCallChain;
   var ret;
   var fn;
-  debugger;
-  if(chain.around.length > 0) {
-    fn = chain.around[0].func;
-    // Remove it from the chain
-    chain.around = chain.around.slice(1);
+  context.currentCombination = context.currentCombination || 'around';
+  if(context.around.length > 0) {
+    fn = context.around[0].func;
+    // Remove it from the context
+    context.around = context.around.slice(1);
+    context.currentCombination = 'around';
     ret = fn.apply(context, args);
-  } else if (chain.primary.length > 0) {
-    chain.before.forEach(function (meth) {meth.func.apply(context, args);});
-    chain.before = [];
-    fn = chain.primary[0].func;
-    chain.primary = chain.primary.slice(1);
+  } else if (context.primary.length > 0) {
+    context.before.forEach(function (meth) {meth.func.apply(context, args);});
+    context.before = [];
+    context.currentCombination = 'primary';
+    fn = context.primary[0].func;
+    context.primary = context.primary.slice(1);
     ret = fn.apply(context, args);
-    chain.after.forEach(function (meth) {meth.func.apply(context, args);});
-    chain.after = [];
+    context.after.forEach(function (meth) {meth.func.apply(context, args);});
+    context.after = [];
   } else {
-    throw "No more method";
+    throw "No next method found for " + name + " in " + context.currentCombination;
   }
   return ret;
 };
@@ -95,29 +95,34 @@ function compareArray(arr1, arr2) {
 
 function defgeneric(name) {
   var generic = function () {
+    this.name = name;
     // One possible implementation of the generic function
     var args = Array.prototype.slice.call(arguments,0);
+    console.log(name + " CALLED with " + args);
     var method = generic.findMethod.apply(this, args);
     return method.apply(this, args);
   };
-
+  
   generic.defmethod = function (discriminator, fn, combination) {
     combination = combination || 'primary';
+    console.log(name + " add " + discriminator + " " + combination);
     // XXX: assign the new method
+    this.removeMethod(discriminator, combination);
     defined[combination].push({discr: discriminator.split(','), func: fn});
     // invalidate cache
-    cache = [];
+    cache = {};
     return generic;
   };
   
   generic.removeMethod = function (discriminator, combination) {
     combination = combination || 'primary';
     // XXX: remove the method
+    console.log(name + " remove " + discriminator + " " + combination);
     discriminator = discriminator.split(',');
     defined[combination] = defined[combination].filter(
       function (meth) {return !arrayEqual(discriminator, meth.discr);});
     // invalidate cache
-    cache = [];
+    cache = {};
     return generic;
   };
 
@@ -128,12 +133,16 @@ function defgeneric(name) {
     var signature = args.map(toType).join(',');
     var method = cache[signature];
     if(method === undefined) {
-      var context = {currentCallChain: generateCallChain(args)};
-      if(context.currentCallChain.primary.length == 0 &&
-         context.currentCallChain.around.length == 0) {
-        throw "No method found for " + name + " with args: " + args.map(printType).join(', ');
+      var chain = generateCallChain(args);
+      if(chain.primary.length == 0 &&
+         chain.around.length == 0) {
+        throw "No method found for " + this.name + " with args: " + args.map(toType).join(',');
       }
-      method = callNextMethod.bind(null, context);
+      method = function () {
+        var args = Array.prototype.slice.call(arguments, 0);
+        args.unshift(cloneCallChain(chain));
+        return callNextMethod.apply(this, args);
+      };
       // Put result in cache
       cache[signature] = method;
     }
@@ -149,8 +158,8 @@ function defgeneric(name) {
     'after': []
   };
 
-  var cache = [];
-  
+  var cache = {};
+
   function generateCallChain(args) {
     function discrToSpecificity(methodArr) {
       var ret = methodArr.map(function (meth) {
@@ -176,6 +185,16 @@ function defgeneric(name) {
       after: discrToSpecificity(defined.after).sort(mostSpecificFirst).reverse()
     };
   };
+
+  function cloneCallChain(chain) {
+    return {
+      around:chain.around.slice(),
+      before:chain.before.slice(),
+      primary:chain.primary.slice(),
+      after:chain.after.slice()
+    };
+  }
+    
 
   return generic;
 };
@@ -242,10 +261,13 @@ assertEquals(matchesType("", 'string'), 2);
 assertEquals(matchesType(new String(), 'string'), 0);
 assertEquals(matchesType(new String(), 'string'), 0);
 
-// testHeader("arrayEqual");
-// assert(arrayEqual(["Mammal", "string", "*"], ["Mammal", "string", "*"]));
-// assert(!arrayEqual(["Mammal", "string", "*"], ["string", "string", "*"]));
-// assert(!arrayEqual(["Mammal", "string", "*"], ["string", "Platypus"]));
+testHeader("arrayEqual");
+assert(arrayEqual(["Mammal", "string", "*"], ["Mammal", "string", "*"]));
+assert(!arrayEqual(["Mammal", "string", "*"], ["string", "string", "*"]));
+assert(!arrayEqual(["Mammal", "string", "*"], ["string", "Platypus"]));
+
+//testHeader("cloneCallChain");
+
 
 testHeader("defmethod");
 var generic = defgeneric("testGeneric1");
@@ -254,18 +276,26 @@ generic
   .defmethod("Mammal,*", function (m, e) { return "Mammals love " + e;})
   .defmethod("Platypus,*", function (p, e) { return "Platypuses love " + e; })
   .defmethod("Platypus,undefined", function (p) { return "Platypus is sad"; });
-// assertEquals(generic(new Mammal(), 3), "Mammals love 3");
-// assertEquals(generic(new Mammal(), "you"), "Mammals love you");
-// assertEquals(generic(new Platypus(), "you"), "Platypuses love you");
-// assertEquals(generic(new Platypus(), undefined), "Platypus is sad");
-// //assertEquals(generic(new Mammal()), "Mammals love nothing");
-    
-// testHeader("removeMethod");
-// generic.removeMethod("Platypus,*");
-// assertEquals(generic(new Platypus(), "even Platypuses"), "Mammals love even Platypuses");
-// generic.removeMethod("Mammal,*");
-// assertEquals(generic(new Platypus()), "Platypus is sad");
-// assertError("No method found for testGeneric1 with args: Platypus, number", generic, new Platypus(), 4);
+assertEquals(generic(new Mammal(), 3), "Mammals love 3");
+assertEquals(generic(new Mammal(), "you"), "Mammals love you");
+assertEquals(generic(new Platypus(), "you"), "Platypuses love you");
+assertEquals(generic(new Platypus(), undefined), "Platypus is sad");
+assertEquals(generic(new Mammal()), "Mammals love nothing");
+generic.defmethod("Platypus,undefined", function () { return "Replaced!";});
+assertEquals(generic(new Platypus(), undefined), "Replaced!");
+  
+testHeader("removeMethod");
+generic = defgeneric("testGeneric1");
+generic
+  .defmethod("Mammal,undefined", function (m, e) { return "Mammals love nothing";})
+  .defmethod("Mammal,*", function (m, e) { return "Mammals love " + e;})
+  .defmethod("Platypus,*", function (p, e) { return "Platypuses love " + e; })
+  .defmethod("Platypus,undefined", function (p) { return "Platypus is sad"; });
+generic.removeMethod("Platypus,*");
+assertEquals(generic(new Platypus(), "even Platypuses"), "Mammals love even Platypuses");
+generic.removeMethod("Mammal,*");
+assertEquals(generic(new Platypus()), "Platypus is sad");
+assertError("No method found for testGeneric1 with args: Platypus, number", generic, new Platypus(), 4);
 
 testHeader("callNextMethod");
 // Simple test for inheritance and callNextMethod() on 'primary' method
@@ -295,9 +325,15 @@ var tryIt = function (a) {
   var ret = describe(a);
   return ret + ':' + msgs;
 };
-    
-console.log(tryIt(new Platypus()));
-console.log("P:platypus1mammal1object1Platy1/object1/mammal1/platypus1");
+assertEquals(tryIt(new Platypus()), "P:platypus1mammal1object1Platy1/object1/mammal1/platypus1");
+
+var find1 = describe.findMethod(new Platypus());
+var find2 = describe.findMethod(new Platypus());
+describe.removeMethod('Platypus');
+var find3 = describe.findMethod(new Platypus());
+var find4 = describe.findMethod(new Mammal());
+assert(find1 === find2);
+assert(find1 !== find3);
 
 /* Comments to improve the kata
 
