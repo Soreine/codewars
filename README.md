@@ -10,6 +10,8 @@ haven't solved yourself already.
 
 ## Problem listing
 
+Ordered from hardest to easiest
+
 ### 1 kyu
 
 - Metaprogramming: Lisp-Style Generic Functions [[description]](http://www.codewars.com/kata/metaprogramming-lisp-style-generic-functions) [[solution]](metaprogramming-lisp-style-generic-functions.js)
@@ -38,6 +40,6 @@ haven't solved yourself already.
 - Scrabble Score [[description]](http://www.codewars.com/kata/scrabble-score) [[solution]](scrabble-score.js)
 - The Span Function [[description]](http://www.codewars.com/kata/the-span-function) [[solution]](the-span-function.js)
 
-### (beta)
+### (unknown)
 
 - Longest 2-Character Substring [[description]](http://www.codewars.com/kata/longest-2-character-substring) [[solution]](longest-2-character-substring.js)
